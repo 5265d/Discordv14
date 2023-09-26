@@ -1,0 +1,6 @@
+/node_modules
+/commands
+/components  
+.env
+/logs
+server.c
