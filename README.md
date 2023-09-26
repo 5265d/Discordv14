@@ -81,10 +81,3 @@ Se deseja contribuir para este projeto, siga os passos:
 ## Licença
 
 Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE.md](LICENSE.md) para detalhes.
-
----
-
-Espero que esta documentação básica ajude você a começar com o seu bot Discord.js! Sinta-se à vontade para personalizar e adicionar mais informações conforme necessário.
-```
-
-Certifique-se de substituir `<SEU_TOKEN_DO_DISCORD>` pelo token do seu bot e personalizar o arquivo README com informações específicas do seu projeto, como descrição, instruções de configuração e uso, comandos disponíveis e detalhes de como os outros podem contribuir para o seu projeto.
