@@ -1,22 +1,29 @@
-const fs = require('node:fs');
-const path = require('node:path');
+const fs = require('fs');
+const path = require('path');
 const readline = require('readline');
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
 require('dotenv').config();
 
+const {
+  getCurrentDate,
+  banUser,
+  updateBanInfo,
+  unbanUser,
+  removeUserFromBanList,
+  clearCommands,
+} = require('./Eventos/function');
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 client.commands = new Collection();
 
-const commandsPath = path.join(__dirname, 'commands');
 
+const commandsPath = path.join(__dirname, 'commands');
 fs.readdirSync(commandsPath)
   .filter(file => file.endsWith('.js'))
   .forEach(file => {
     const command = require(path.join(commandsPath, file));
     if ('data' in command && 'execute' in command) {
       client.commands.set(command.data.name, command);
-    } else {
-      return;
     }
   });
 
@@ -52,8 +59,8 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-const token = process.env.token;
 
+const token = process.env.token;
 if (!token) {
   console.error('Token não definido no arquivo .env.');
   process.exit(1);
@@ -62,25 +69,15 @@ if (!token) {
 client.on('messageCreate', (message) => {
   if (message.author.bot) return;
 
-  const guildName = message.guild.name;
-  const userId = message.author.id;
-  const userName = message.author.username;
-  const messageDate = new Date().toLocaleDateString();
-  const messageTime = new Date().toLocaleTimeString();
-
-  const formattedMessage = `[${messageDate} ${messageTime}] ${userName} (${userId}) em ${guildName}`;
-
+  const { guild, author } = message;
+  const formattedMessage = `[${new Date().toLocaleString()}] ${author.tag} (${author.id}) em ${guild.name}`;
   const logFileName = './logs/message-log.txt';
+
   fs.appendFile(logFileName, formattedMessage + '\n', (err) => {
-    if (err) {
-      console.error('Erro ao registrar a mensagem:', err);
-    } else {
-      return;
-    }
+    if (err) console.error('Erro ao registrar a mensagem:', err);
   });
 });
 
-// Evento para tratar erros
 client.on('error', (error) => {
   console.error('O bot encontrou um erro:', error);
 });
@@ -123,23 +120,12 @@ rl.on('line', (input) => {
       console.log('Uso correto: ban <userId> [bannedDays]');
     } else {
       const existingBan = isUserBanned(userId);
+      const newBannedDays = existingBan ? existingBan.bannedDays + (bannedDays || 0) : bannedDays || 0;
 
-      if (existingBan) {
-        const newBannedDays = existingBan.bannedDays + (bannedDays || 0);
-        updateBanInfo(userId, newBannedDays);
-        if (newBannedDays === 0) {
-          console.log(`Usuário ${userId} foi banido permanentemente.`);
-        } else {
-          console.log(`Usuário ${userId} teve seu banimento estendido por ${bannedDays} dias.`);
-        }
-      } else {
-        banUser(userId, bannedDays);
-        if (bannedDays === 0) {
-          console.log(`Usuário ${userId} foi banido permanentemente.`);
-        } else {
-          console.log(`Usuário ${userId} foi banido por ${bannedDays} dias.`);
-        }
-      }
+      if (newBannedDays === 0) console.log(`Usuário ${userId} foi banido permanentemente.`);
+      else console.log(`Usuário ${userId} teve seu banimento ${existingBan ? 'estendido' : 'criado'} por ${newBannedDays} dias.`);
+      if (!existingBan) banUser(userId, newBannedDays);
+      else updateBanInfo(userId, newBannedDays);
     }
   } else if (command === 'unban') {
     const userId = args[0];
@@ -148,11 +134,8 @@ rl.on('line', (input) => {
       console.log('Uso correto: unban <userId>');
     } else {
       const success = unbanUser(userId);
-      if (success) {
-        console.log(`Usuário ${userId} foi desbanido.`);
-      } else {
-        console.log(`Usuário ${userId} não encontrado na lista de banidos.`);
-      }
+      if (success) console.log(`Usuário ${userId} foi desbanido.`);
+      else console.log(`Usuário ${userId} não encontrado na lista de banidos.`);
     }
   } else if (command === 'limparlogs') {
     clearCommands();
@@ -175,84 +158,3 @@ rl.on('close', () => {
   console.log('Encerrando.');
   process.exit(0);
 });
-
-function getCurrentDate() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}/${month}/${day}`;
-}
-
-function banUser(userId, bannedDays) {
-  const bannedAt = getCurrentDate();
-  const banInfo = `${userId}, ${bannedDays}, ${bannedAt}`;
-
-  fs.appendFileSync('./logs/banned-users.txt', `${banInfo}\n`);
-}
-
-function updateBanInfo(userId, bannedDays) {
-  const bannedUsersFile = './logs/banned-users.txt';
-  if (fs.existsSync(bannedUsersFile)) {
-    const bannedUsers = fs
-      .readFileSync(bannedUsersFile, 'utf-8')
-      .split('\n')
-      .map(line => line.trim());
-
-    const updatedBanList = bannedUsers.map(line => {
-      const [id, oldBannedDays, bannedAt] = line.split(',').map(item => item.trim());
-      if (id === userId) {
-        return `${id}, ${bannedDays}, ${bannedAt}`;
-      }
-      return line;
-    });
-
-    fs.writeFileSync(bannedUsersFile, updatedBanList.join('\n'));
-  }
-}
-
-function unbanUser(userId) {
-  const bannedUsersFile = './logs/banned-users.txt';
-  if (fs.existsSync(bannedUsersFile)) {
-    const bannedUsers = fs
-      .readFileSync(bannedUsersFile, 'utf-8')
-      .split('\n')
-      .map(line => line.trim());
-
-    const updatedBanList = bannedUsers.filter(line => {
-      const [id] = line.split(',').map(item => item.trim());
-      return id !== userId;
-    });
-
-    if (bannedUsers.length === updatedBanList.length) {
-      return false;
-    }
-
-    fs.writeFileSync(bannedUsersFile, updatedBanList.join('\n'));
-    return true;
-  }
-
-  return false;
-}
-
-function removeUserFromBanList(userId) {
-  const bannedUsersFile = './logs/banned-users.txt';
-  if (fs.existsSync(bannedUsersFile)) {
-    const bannedUsers = fs
-      .readFileSync(bannedUsersFile, 'utf-8')
-      .split('\n')
-      .map(line => {
-        const [id] = line.split(',').map(item => item.trim());
-        return id;
-      });
-
-    const updatedBanList = bannedUsers.filter(id => id !== userId);
-
-    fs.writeFileSync(bannedUsersFile, updatedBanList.join('\n'));
-  }
-}
-
-function clearCommands() {
-  fs.unlinkSync('./logs/message-log.txt');
-  console.log('Registro de comandos limpo com sucesso.');
-}
