@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, ActivityType, REST, Routes } = require('discord.js');
 require('dotenv').config();
 
 const {
@@ -82,6 +82,30 @@ client.on('error', (error) => {
   console.error('O bot encontrou um erro:', error);
 });
 
+client.on('ready', (c) => {
+
+  const status = [
+    {
+      name: 'League of Legends',
+      type: ActivityType.Playing,
+    },
+    {
+      name: 'La Casa de Papel EP5 T1',
+      type: ActivityType.Watching,
+    },
+    {
+      name: 'Spotify',
+      type: ActivityType.Listening
+    }
+  ]
+
+  setInterval(() => {
+    let random = Math.floor(Math.random() * status.length);
+    client.user.setActivity(status[random]);
+  }, 10000)
+
+});
+
 client.login(token);
 
 function isUserBanned(userId) {
@@ -158,3 +182,4 @@ rl.on('close', () => {
   console.log('Encerrando.');
   process.exit(0);
 });
+
